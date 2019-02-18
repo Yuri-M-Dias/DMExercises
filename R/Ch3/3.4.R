@@ -249,5 +249,94 @@ table(db$cluster,iris$Species)
 
 # 3.4.4
 
+# 3.4.4.1
 
+grubbs.outliers <- function(x, p.thresh = 0.05) {
+  require(outliers, quietly = TRUE)
+  x <- x[!is.na(x)]
+  n <- length(x)
+  zs <- abs(x - mean(x)) / sd(x)
+  outs <- 1 - sapply(zs, function(z) pgrubbs(z, n, type = 10))
+  posOuts <- which(outs <= p.thresh)
+  return(
+   list(
+    zs = zs,
+    pvals = outs,
+    outliers = x[posOuts],
+    positions = posOuts
+   )
+  )
+}
+data(algae, package="DMwR2")
+grubbs.outliers(algae$a2)$outliers
+table(algae$season)/length(algae$season)
+
+#3.4.4.2
+dbscan.outliers <- function(data, ...) {
+  require(fpc, quietly=TRUE)
+  cl <- dbscan(data, ...)
+  posOuts <- which(cl$cluster == 0)
+  list(positions = posOuts,
+       outliers = data[posOuts, ],
+       dbscanResults = cl)
+}
+
+library(forcats)
+data(Glass, package = "mlbench")
+count(Glass, Type)
+
+g = Glass %>%
+  mutate(
+    Type = forcats::fct_collapse(
+       Type,
+       rare = as.character(c(3, 5, 6)),
+       normal = as.character(c(1, 2, 7))
+    )
+  )
+
+g %>%
+  count(Type) %>%
+  mutate(prop = 100 * n / nrow(g))
+
+outs <- dbscan.outliers(g[,-10], eps=1, scale=TRUE)
+head(outs$outliers)
+nrow(outs$outliers)
+g %>%
+  slice(outs$positions) %>%
+  count(Type)
+
+g %>%
+  count(Type)
+
+og <- DMwR2::outliers.ranking(select(g, -Type))
+slice(g, og$rank.outliers[1:40]) %>% count(Type)
+
+library(DMwR2)
+lof.scores <- lofactor(select(g, -Type), 10)
+g %>%
+  slice(order(lof.scores, decreasing = TRUE)[1:40]) %>%
+  count(Type)
+
+library(UBL)
+g %>%
+  count(Type)
+
+newg <- RandUnderClassif(Type ~ ., g)
+count(newg, Type)
+
+newg2 <- RandUnderClassif(Type ~ ., g, list(normal=0.4, rare=1))
+count(newg2,Type)
+
+newg3 <- RandOverClassif(Type ~ .,g)
+count(newg3,Type)
+
+library(e1071)
+trainD <- filter(g, Type == "normal") %>% select(-Type)
+s <- svm(trainD, y=NULL, type="one-classification", nu=0.5)
+(cm <- table(g$Type, predict(s,select(g, -Type))))
+
+# 3.4.5 -> Predictive Analytics
+# Only did some notes for the different classification metrics
+
+# 3.4.5.2 -> Tree-Based models
 
